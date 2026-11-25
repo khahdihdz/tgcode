@@ -1,0 +1,70 @@
+# Deploy lên Cloudflare Workers khi push lên nhánh main.
+# Quy trình: npm ci -> typecheck -> test -> build -> deploy.
+# Deploy CHỈ chạy khi mọi bước kiểm tra đều thành công.
+#
+# GitHub Repository Secrets cần cấu hình (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, XINGCHI_API_KEY
+#
+# Lưu ý: nếu có thể, ưu tiên GitHub OIDC để xác thực Cloudflare thay cho
+# API token dài hạn. Cấu hình hiện tại dùng API token với quyền tối thiểu
+# cần thiết (Workers: Edit) làm phương án dự phòng đã được kiểm chứng.
+
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Chỉ deploy khi typecheck + test + build đều thành công.
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Đưa secrets vào Worker (không in giá trị ra log, không ghi ra file).
+      # Deploy lần đầu tạo Worker, sau đó đặt secrets, rồi deploy lại một lần
+      # để chắc chắn phiên bản đang chạy có đầy đủ secrets.
+      - name: Set Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          XINGCHI_API_KEY: ${{ secrets.XINGCHI_API_KEY }}
+        run: |
+          printf '%s' "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN
+          printf '%s' "$TELEGRAM_WEBHOOK_SECRET" | npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
+          printf '%s' "$XINGCHI_API_KEY" | npx wrangler secret put XINGCHI_API_KEY
+
+      - name: Deploy again with secrets in place
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
