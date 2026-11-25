@@ -1,0 +1,23 @@
+# Cloudflare Workers — cấu hình triển khai.
+# Secrets (TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, XINGCHI_API_KEY)
+# KHÔNG được ghi ở đây. Cấu hình bằng `wrangler secret put` hoặc
+# GitHub Actions (xem .github/workflows/deploy.yml và README.md).
+
+name = "xingchi-telegram-bot"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Model mặc định — phải là model ID do /v1/models trả về.
+# Để trống nếu muốn người dùng bắt buộc chọn bằng lệnh /model.
+DEFAULT_MODEL = ""
+MAX_OUTPUT_TOKENS = "1024"
+MAX_HISTORY_MESSAGES = "20"
+RATE_LIMIT_PER_MINUTE = "20"
+# ALLOWED_USER_IDS = ""  # VD: "123456789,987654321" — để trống = cho phép mọi người dùng.
+
+# (Tùy chọn) Lưu lịch sử bền vững bằng Cloudflare KV.
+# Tạo KV namespace rồi bỏ comment và điền ID thật:
+# [[kv_namespaces]]
+# binding = "HISTORY_KV"
+# id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
